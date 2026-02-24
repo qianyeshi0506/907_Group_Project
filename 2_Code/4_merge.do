@@ -10,55 +10,55 @@ clear all
 set more off
 
 *---------------------------------------------------------------------------
-* Step 1: 载入主数据集（ESG 面板）
+* Step 1: load main data set (ESG panel)
 *---------------------------------------------------------------------------
 use "F:\\Onedrive映射\\1kcl\\ESG\\7QQMM907\\907_Group_Project\\1_Data\\2_Processed\\WB_ESG_panel_cleaned.dta", clear
 
 *---------------------------------------------------------------------------
-* Step 2: 合并收入分组数据
-* many-to-one：ESG 面板中每个国家有多个年份，income group 每个国家只有一行
+* Step 2: merge and include grouping data
+* many-to-one：each country in ESG panel includes multiple years, however only one row for each country in "income group"
 *---------------------------------------------------------------------------
 merge m:1 country_code using"F:\\Onedrive映射\\1kcl\\ESG\\7QQMM907\\907_Group_Project\\1_Data\\2_Processed\\WB_income_group.dta"
 
 *---------------------------------------------------------------------------
-* Step 3: 检查合并结果
+* Step 3: check merging result
 *---------------------------------------------------------------------------
-* _merge == 1：仅在 ESG 面板中存在（无对应 income group）
-* _merge == 2：仅在 income group 中存在（不在 ESG 面板中）
-* _merge == 3：成功匹配
+* _merge == 1：only exist in ESG panel, no corresponding income group
+* _merge == 2：only exist in income group, no corresponding ESG panel
+* _merge == 3：successful match
 
 tab _merge
 
-* 查看未匹配的国家（_merge == 1，可能是地区聚合体如 World, Euro Area 等）
+* check unmatched country (_merge == 1, may be region World or Euro Area)
 list country_name country_code if _merge == 1, clean noobs
 
-* 查看 income group 中多余的国家（_merge == 2）
+* check redundant country in income group (_merge == 2)
 list country_code if _merge == 2, clean noobs
 
 *---------------------------------------------------------------------------
-* Step 4: 处理未匹配观测
-* 通常 _merge==2 是 income group 文件中有但 ESG 面板没有的国家，可直接删除
+* Step 4: manage unmatched observation
+*  _merge==2 is usualy a country in income group but not in ESG panel, can be deleted
 *---------------------------------------------------------------------------
 drop if _merge == 2
 
-* 删除合并标识变量
+* delete merge indicator variable
 drop _merge
 
 *---------------------------------------------------------------------------
-* Step 5: 验证合并结果
+* Step 5: varify merging result
 *---------------------------------------------------------------------------
-* 查看 income 变量的分布
+* check income variable distribution
 tab income
 
-* 确认 income 的编码含义（High/Low/Lower-middle/Upper-middle）
+* check income coding definition（High/Low/Lower-middle/Upper-middle）
 label list income
 
-* 检查是否有国家缺失 income 分组
+* check if any country is missing income group
 count if missing(income)
 list country_name country_code if missing(income), clean noobs
 
 *---------------------------------------------------------------------------
-* Step 6: 声明面板结构并保存
+* Step 6: state panel structure and save file
 *---------------------------------------------------------------------------
 xtset id year
 
@@ -67,5 +67,5 @@ sort id year
 
 save "F:\\Onedrive映射\\1kcl\\ESG\\7QQMM907\\907_Group_Project\\1_Data\\2_Processed\\WB_ESG_panel_final.dta", replace
 
-di "合并完成！共 " _N " 条观测值"
+di "Merge finished! Total " _N " pbservations"
 describe
