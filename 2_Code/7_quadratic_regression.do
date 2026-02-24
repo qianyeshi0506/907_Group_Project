@@ -18,7 +18,7 @@ gen ln_energy_intensity = ln(energy_intensity)
 gen ln_electricity_production = ln(electricity_production + 0.001)
 
 *=========================================
-* 二次项回归：验证 REShare 与 CO₂ 的非线性关系
+* binominal regression: varify nonlinear relation between REShare and CO2
 *=========================================
 xtreg ln_co2 c.ln_reshare##c.ln_reshare ///
     ln_energy_intensity ln_electricity_production ///
@@ -28,7 +28,7 @@ xtreg ln_co2 c.ln_reshare##c.ln_reshare ///
 estimates store quadratic_fe
 
 *=========================================
-* 保存结果
+* save result
 *=========================================
 esttab quadratic_fe using "quadratic_nonlinear.rtf", ///
     b(3) se(3) ///
@@ -43,9 +43,9 @@ esttab quadratic_fe using "quadratic_nonlinear.rtf", ///
     replace
 
 *=========================================
-* 边际效应：在不同 ln_reshare 水平下 dln_co2/dln_reshare
+* marginal effect: dln_co2/dln_reshare under different ln_reshare level
 *=========================================
-* ln(reshare+0.001) 的实际范围约 -7 到 4.6（对应 reshare ≈ 0 到 100）
+* ln(reshare+0.001) actual range between -7 to 4.6（corrsponding to reshare ≈ 0 to 100）
 margins, dydx(ln_reshare) at(ln_reshare = (-7(1)4))
 
 marginsplot, ///
