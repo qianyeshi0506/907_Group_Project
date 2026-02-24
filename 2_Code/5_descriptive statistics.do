@@ -11,40 +11,40 @@ clear all
 set more off
 
 *---------------------------------------------------------------------------
-* Step 1: 载入最终数据集
+* Step 1: load data set: ESG_final
 *---------------------------------------------------------------------------
 use "F:\Onedrive映射\1kcl\ESG\7QQMM907\907_Group_Project\1_Data\2_Processed\WB_ESG_panel_final.dta", clear
 rename government_effectivenes government_effectiveness
 
 *---------------------------------------------------------------------------
-* Step 2: 声明面板结构
+* Step 2: state panel structure
 *---------------------------------------------------------------------------
 xtset id year
 
 *---------------------------------------------------------------------------
-* Step 3: 全样本描述性统计
+* Step 3: descriptive statistics for all samples 
 *---------------------------------------------------------------------------
-* 基础统计量（obs, mean, sd, min, max）
+* basic statistics 
 summarize co2 reshare electricity_production energy_intensity government_effectiveness income
 
-* 更详细的统计（含百分位数）
+* detailed statistics (include decimal points)
 summarize co2 reshare electricity_production energy_intensity government_effectiveness, detail
 
 *---------------------------------------------------------------------------
-* Step 4: 按收入组分组描述性统计
+* Step 4: descriptive statistics as income group
 *---------------------------------------------------------------------------
 * income: 1=High, 2=Low, 3=Lower-middle, 4=Upper-middle
 bysort income: summarize co2 reshare electricity_production energy_intensity government_effectiveness
 
 *---------------------------------------------------------------------------
-* Step 5: 输出格式化描述性统计表（可导出至 Word/LaTeX）
+* Step 5: export formated descriptive statistics table (exportable to Word/LaTeX)
 *---------------------------------------------------------------------------
 
-* 安装命令：ssc install estout, replace
+* install commend: ssc install estout, replace
 *---------------------------------------------------------------------------
-* 添加变量标签（label），使输出表格显示可读名称
+* add variable lebal, to show meaningful name in tables
 *---------------------------------------------------------------------------
-*更改标签
+*change label
 label variable co2                    "CO2 Emissions (metric tons per capita)"
 label variable reshare                "Renewable Energy Share (% of total)"
 label variable electricity_production "Electricity from Coal (% of total)"
@@ -58,43 +58,43 @@ esttab using "descriptive_stats.rtf", cells("mean(fmt(3)) sd(fmt(3)) min(fmt(3))
 
 
 *---------------------------------------------------------------------------
-* Step 6: 变量相关系数矩阵
+* Step 6: variable correlation matric 
 *---------------------------------------------------------------------------
 pwcorr co2 reshare electricity_production energy_intensity government_effectiveness, star(0.05)
 
-* 输出相关系数矩阵至 Word
+* export correlation matric to word
 estpost correlate co2 reshare electricity_production energy_intensity government_effectiveness, matrix listwise
 
 esttab using "correlation_matrix.rtf", not nostar unstack noobs compress replace title("Table 2: Correlation Matrix")
 
 *---------------------------------------------------------------------------
-* Step 7: 面板数据基本特征
+* Step 7: panel data basic characteristics 
 *---------------------------------------------------------------------------
-* 查看面板平衡性
+* view balance of panel
 xtdescribe
 
-* 时间维度统计
+* time dimension statistics
 tabstat co2 reshare electricity_production energy_intensity government_effectiveness, by(year) stats(mean) format(%9.3f)
 
-* 国家维度统计（按收入组）
+* coutry dimension statistics (as per income groups)
 tabstat co2 reshare electricity_production energy_intensity government_effectiveness, by(income) stats(mean sd) format(%9.3f)
 
 *---------------------------------------------------------------------------
-* Step 8: 可视化——变量分布与趋势
+* Step 8: visualisation - variable distribution and trends
 *---------------------------------------------------------------------------
 
 *---------------------------------------------------------------------------
-* 生成年份均值变量
+* calculate mean change yearly
 *---------------------------------------------------------------------------
 bysort year: egen mean_co2    = mean(co2)
 bysort year: egen mean_reshare = mean(reshare)
 
-* 保留每年唯一一行用于绘图
+* keep mean each year for plotting
 preserve
 collapse (mean) mean_co2 mean_reshare, by(year)
 drop if mean_co2==. | mean_reshare==.
 
-* 绘图
+* plotting
 
 twoway ///
     (line mean_co2 year,     lcolor(cranberry) lwidth(medthick) lpattern(solid)) ///
@@ -123,8 +123,8 @@ twoway ///
 graph export "trend_co2_reshare.png", replace width(2400)
 restore
 
-* 各收入组箱线图
-*箱线图-CO2绝对值
+* boxplot for each income groups
+*boxplot-CO2 absolute
 graph box co2, over(income, ///
         label(labsize(medsmall) angle(0))) ///
     ///
@@ -160,8 +160,8 @@ graph box co2, over(income, ///
 
 graph export "boxplot_co2_income.png", replace width(2400)
 
-*箱线图-CO₂ 取对数
-gen ln_co2 = ln(co2 + 0.01)   // +0.01 避免 ln(0) 报错
+*boxplot-CO₂ Ln
+gen ln_co2 = ln(co2 + 0.01)   // add +0.01 to avoid ln(0) error
 
 graph box ln_co2, over(income, label(labsize(medsmall) angle(0))) ///
     box(1, color(gs10) lcolor(black) lwidth(thin)) ///
@@ -184,7 +184,7 @@ graph box ln_co2, over(income, label(labsize(medsmall) angle(0))) ///
 
 graph export "boxplot_lnco2_income.png", replace width(2400)
 
-* 核密度-ln_co2
+* kdensity-ln_co2
 twoway ///
     (kdensity ln_co2 if income == 1, ///
         lcolor(black) lwidth(medthick) lpattern(solid)) ///
