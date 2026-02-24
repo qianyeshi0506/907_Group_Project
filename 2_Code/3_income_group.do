@@ -1,18 +1,18 @@
-//导入需要合并的文件
+//import data set to be merged
 import excel "F:\Onedrive映射\1kcl\ESG\7QQMM907\907_Group_Project\1_Data\1_Raw\Word Bank_Income group.xlsx", sheet("List of economies") firstrow clear
 
-//删掉没用的列
+//delete unused column
 drop Economy Region Lendingcategory
 
-//重命名
+//rename variable
 rename Code country_code
 
-//将income group转化为数值类型，储存到新变量income中
+//change "income group" variable type to value, store in new variable "income"
 encode Incomegroup ,gen(income)
 
-//删除空值
+//delete empty value
 drop if income == .
 
-//保存处理后的文件
+//save processed data
 save "WB_income_group.dta"
 
