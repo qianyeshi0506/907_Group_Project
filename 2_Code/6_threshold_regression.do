@@ -32,27 +32,33 @@ misstable summarize co2 reshare energy_intensity electricity_production governme
 * threshold regression
 
 *=======================================
-*single threshold model
+*single threshold model H0 vs H1
 *=======================================
 
-xthreg ln_co2 ln_energy_intensity ln_electricity_production government_effectiveness, rx(ln_reshare) qx(ln_reshare) thnum(1) trim(0.01) grid(400) bs(300) 
+xthreg ln_co2 ln_energy_intensity ln_electricity_production government_effectiveness, rx(ln_reshare) qx(ln_reshare) thnum(1) trim(0.01) grid(400) bs(500) thlevel(95) nobslog
 
 estimates store threshold_single
 
 *=================================
-* double threshold model
+* double threshold model H1 vs H2
 *=====================================
-xthreg ln_co2 ln_energy_intensity ln_electricity_production government_effectiveness, rx(ln_reshare) qx(ln_reshare) thnum(2) trim(0.01 0.01) grid(400) bs(300 300)
+xthreg ln_co2 ln_energy_intensity ln_electricity_production government_effectiveness, rx(ln_reshare) qx(ln_reshare) thnum(2) trim(0.15 0.15) grid(400) bs(0 500) thlevel(95) nobslog thgiven
 
 estimates store threshold_double
-
-*=========================================
-* three threshold model
+/*=========================================
+* three threshold model H2 vs H3
 *===========================================
-xthreg ln_co2 ln_energy_intensity ln_electricity_production government_effectiveness, rx(ln_reshare) qx(ln_reshare) thnum(3) trim(0.01 0.01 0.01) grid(400) bs(300 300 300)
+xthreg ln_co2 ln_energy_intensity ln_electricity_production government_effectiveness, rx(ln_reshare) qx(ln_reshare) thnum(3) trim(0.01 0.01 0.01) grid(400) bs(0 0 500)
 
 estimates store threshold_triple
 
+scalar th3_F    = e(Fstat)
+scalar th3_pval = e(pval)
+scalar th3_est  = e(thhat3)      // γ̂₃
+scalar th3_lo   = e(thCIlo3)
+scalar th3_hi   = e(thCIhi3)
+
+ereturn list
 *=========================================
 * combine three models and compare 
 *=========================================
@@ -68,7 +74,7 @@ esttab threshold_single threshold_double threshold_triple ///
          "All models include country and year fixed effects." ///
          "Threshold variable: ln(REShare + 0.001).") ///
     replace
-ereturn list
+ereturn list*/
 
 *=========================================
 * three threshold LR statistic graph
@@ -98,7 +104,7 @@ _matplot e(LR22), columns(1 2) ///
     bgcolor(white) xsize(12) ysize(8) ///
     name(LR_triple_2, replace) nodraw
 
-* third threshold：e(LR3)，347×2
+/* third threshold：e(LR3)，347×2
 _matplot e(LR3), columns(1 2) ///
     yline(7.35, lpattern(dash) lcolor(black) lwidth(thin)) ///
     connect(direct) recast(line) ///
@@ -108,16 +114,16 @@ _matplot e(LR3), columns(1 2) ///
     title("(c) Third Threshold", size(medsmall) color(black)) ///
     graphregion(color(white)) plotregion(color(white) lcolor(black) lwidth(thin)) ///
     bgcolor(white) xsize(12) ysize(8) ///
-    name(LR_triple_3, replace) nodraw
+    name(LR_triple_3, replace) nodraw*/
 
 * combine graph
-graph combine LR_triple_1 LR_triple_2 LR_triple_3, ///
+graph combine LR_triple_1 LR_triple_2, ///
     cols(1) rows(3) ///
-    title("Triple Threshold LR Statistics", ///
+    title("Double Threshold LR Statistics", ///
           size(medsmall) color(black)) ///
     note("Note: Dashed line indicates 95% critical value (7.35).", ///
          size(vsmall) color(gs8)) ///
     graphregion(color(white)) ///
     xsize(12) ysize(20)
 
-graph export "LR_triple_threshold.png", replace width(2400)
+graph export "LR_double_threshold.png", replace width(2400)

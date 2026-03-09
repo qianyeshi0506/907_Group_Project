@@ -27,6 +27,62 @@ xtreg ln_co2 c.ln_reshare##c.ln_reshare ///
 
 estimates store quadratic_fe
 
+
+margins, dydx(ln_reshare)                            ///
+    at(ln_reshare = (-7(0.1)4)) noestimcheck post
+
+marginsplot, saving(me_plot, replace) nodraw
+
+matrix M = r(b)
+
+parmest, saving(me_results, replace) idnum(1)
+use me_results, clear
+
+gen x_val = -7 + (_n-1) * 0.1
+
+
+gen region = 1 if x_val < -4          
+replace region = 2 if x_val >= -4     
+
+
+twoway ///
+    (rarea min95 max95 x_val if region==1,           ///
+     color(cranberry%20) lwidth(none))               ///
+    (rarea min95 max95 x_val if region==2,           ///
+     color(navy%25) lwidth(none))                    ///
+    (line estimate x_val if region==1,               ///
+     lcolor(cranberry) lwidth(medium) lpattern(dash)) ///
+    (line estimate x_val if region==2,               ///
+     lcolor(navy) lwidth(medthick))                  ///
+    (function y=0, range(-7 4)                       ///
+     lcolor(gs6) lpattern(dash) lwidth(thin))        ///
+    ,                                                ///
+    xline(-4, lcolor(cranberry) lpattern(shortdash)  ///
+          lwidth(medthick))                          ///
+    xlabel(-7(1)4, labsize(small))                   ///
+    ylabel(-0.6(0.1)0.25, labsize(small))            ///
+    ytitle("dy/dx of ln(REShare)", size(small))      ///
+    xtitle("ln(REShare + 0.001)", size(small))       ///
+    title("Marginal Effect of ln(REShare) on ln(CO{subscript:2})", ///
+          size(medsmall))                            ///
+    legend(order(                                    ///
+        2 "95% CI — Main sample region"              ///
+        1 "95% CI — Sparse region (REShare < 2%)"   ///
+        4 "ME — Main sample (ln ≥ −4)"              ///
+        3 "ME — Sparse region (ln < −4, caution)")  ///
+        pos(1) ring(0) cols(1) size(vsmall))         ///
+    text(0.22 -5.8                                   ///
+        "Positive ME in sparse"                      ///
+        "region: n = `=scalar(n_sparse)'"            ///
+        "(`=scalar(pct_sparse)'% of sample)"        ///
+        , size(vsmall) color(cranberry))             ///
+    note("Red dashed line = marginal effect in sparse region (REShare < 2%)." ///
+         "Despite positive ME, this reflects data sparsity, not a robust"    ///
+         "mechanism. Solid blue line represents the main sample region.",     ///
+         size(vsmall))
+
+graph export "marginal_effect_revised.png", replace width(2400)
+
 *=========================================
 * save result
 *=========================================

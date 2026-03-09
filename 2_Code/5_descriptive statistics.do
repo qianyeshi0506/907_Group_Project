@@ -16,10 +16,29 @@ set more off
 use "F:\Onedrive映射\1kcl\ESG\7QQMM907\907_Group_Project\1_Data\2_Processed\WB_ESG_panel_final.dta", clear
 rename government_effectivenes government_effectiveness
 
+xtset id year //before deleting NA, balanced panel as data
+
+drop if energy_intensity==. | electricity_production==. | reshare==. | co2==. | government_effectivenes==. | income==. //deleting NA
+
+xtset id year //panel unbalanced after deletion
+
+tab year
+
+drop if year==2000 //tab year spotted 2001 data missing, delete 2000 data, change scope to 2002-2020
+
+xtbalance, range(2002 2020) //rebalancing
+
+xtset id year //varify result
+
+summarize co2 reshare energy_intensity electricity_production government_effectivenes //take Ln for right skewed variable
 *---------------------------------------------------------------------------
-* Step 2: state panel structure
+* Step 2: Generate transformed variables
 *---------------------------------------------------------------------------
-xtset id year
+gen ln_co2                    = ln(co2)
+gen ln_energy_intensity       = ln(energy_intensity)
+gen ln_reshare                = ln(reshare + 0.001)
+gen ln_electricity_production = ln(electricity_production + 0.001)
+
 
 *---------------------------------------------------------------------------
 * Step 3: descriptive statistics for all samples 
@@ -39,6 +58,8 @@ bysort income: summarize co2 reshare electricity_production energy_intensity gov
 *---------------------------------------------------------------------------
 * Step 5: export formated descriptive statistics table (exportable to Word/LaTeX)
 *---------------------------------------------------------------------------
+estpost summarize co2 reshare electricity_production energy_intensity government_effectiveness
+
 
 * install commend: ssc install estout, replace
 *---------------------------------------------------------------------------
@@ -56,7 +77,13 @@ estpost summarize co2 reshare electricity_production energy_intensity government
 
 esttab using "descriptive_stats.rtf", cells("mean(fmt(3)) sd(fmt(3)) min(fmt(3)) max(fmt(3)) count(fmt(0))") label title("Table 1: Descriptive Statistics") collabels("Mean" "Std. Dev." "Min" "Max" "Obs") nonum replace
 
-
+esttab using "descriptive_stats_regression_sample.rtf", ///
+    cells("mean(fmt(3)) sd(fmt(3)) min(fmt(3)) max(fmt(3)) count(fmt(0))") ///
+    label ///
+    title("Table 1: Descriptive Statistics (Regression Sample)") ///
+    collabels("Mean" "Std. Dev." "Min" "Max" "Obs") ///
+    nonum replace ///
+    note("N = 3,325. Balanced panel: 175 countries, 2002-2020.")
 *---------------------------------------------------------------------------
 * Step 6: variable correlation matric 
 *---------------------------------------------------------------------------
@@ -82,143 +109,154 @@ tabstat co2 reshare electricity_production energy_intensity government_effective
 *---------------------------------------------------------------------------
 * Step 8: visualisation - variable distribution and trends
 *---------------------------------------------------------------------------
+* Global graph settings
+set scheme s1mono          // clean monochrome base scheme
+graph set window fontface "Times New Roman"
+
 
 *---------------------------------------------------------------------------
-* calculate mean change yearly
+* Figure 1: Time trends — CO₂ Emissions vs Renewable Energy Share
 *---------------------------------------------------------------------------
-bysort year: egen mean_co2    = mean(co2)
-bysort year: egen mean_reshare = mean(reshare)
-
-* keep mean each year for plotting
 preserve
-collapse (mean) mean_co2 mean_reshare, by(year)
-drop if mean_co2==. | mean_reshare==.
-
-* plotting
+collapse (mean) co2 reshare, by(year)
 
 twoway ///
-    (line mean_co2 year,     lcolor(cranberry) lwidth(medthick) lpattern(solid)) ///
-    (line mean_reshare year, lcolor(navy)      lwidth(medthick) lpattern(dash) yaxis(2)), ///
+    (connected co2 year, ///
+        lcolor(black) lwidth(medthick) lpattern(solid) ///
+        mcolor(black) msymbol(circle) msize(small)) ///
+    (connected reshare year, ///
+        lcolor(gs6) lwidth(medthick) lpattern(dash) ///
+        mcolor(gs6) msymbol(triangle) msize(small) yaxis(2)), ///
     ///
-    title("CO{subscript:2} Emissions vs Renewable Energy Share Over Time", ///
-          size(medium) color(black)) ///
+    ytitle("Mean CO{subscript:2} Emissions (metric tons per capita)", ///
+           axis(1) size(medsmall)) ///
+    ytitle("Mean Renewable Energy Share (%)", ///
+           axis(2) size(medsmall)) ///
+    xtitle("Year", size(medsmall)) ///
     ///
-    ytitle("Mean CO{subscript:2} (metric tons per capita)", axis(1) size(small)) ///
-    ytitle("Mean Renewable Energy Share (%)",               axis(2) size(small)) ///
-    xtitle("Year", size(small)) ///
+    xlabel(2002(2)2020, labsize(small) angle(0)) ///
+    ylabel(3.8(0.2)4.8, axis(1) labsize(small) format(%4.1f) ///
+           grid glcolor(gs14) glwidth(vthin) glpattern(dot)) ///
+    ylabel(32(1)36, axis(2) labsize(small) format(%3.0f)) ///
     ///
-    xlabel(1990(5)2023, labsize(small) grid glcolor(gs14)) ///
-    ylabel(, axis(1) labsize(small) grid glcolor(gs14)) ///
-    ylabel(, axis(2) labsize(small)) ///
+    legend(order(1 "CO{subscript:2} emissions" ///
+                 2 "Renewable energy share") ///
+           position(6) rows(1) size(small) ///
+           region(lwidth(none) color(none))) ///
     ///
-    legend(order(1 "CO{subscript:2} Emissions" 2 "Renewable Energy Share") ///
-           position(6) rows(1) size(small) region(lwidth(none))) ///
-    ///
-    graphregion(color(white)) ///
-    plotregion(color(white)) ///
-    bgcolor(white) ///
-    ///
-    xsize(16) ysize(10)
+    graphregion(color(white) margin(small)) ///
+    plotregion(color(white) lcolor(black) lwidth(thin)) ///
+    xsize(6.5) ysize(4)
 
-graph export "trend_co2_reshare.png", replace width(2400)
+graph export "Fig1_trend_co2_reshare.pdf", replace as(pdf)
+graph export "Fig1_trend_co2_reshare.tif", replace width(3900) // 6.5in × 600dpi
+
 restore
 
-* boxplot for each income groups
-*boxplot-CO2 absolute
+*---------------------------------------------------------------------------
+* Figure 2: Box plots — CO₂ by Income Group (original scale + log scale)
+*---------------------------------------------------------------------------
+
+* Panel (a): Original scale
 graph box co2, over(income, ///
-        label(labsize(medsmall) angle(0))) ///
+        relabel(1 "High" 2 "Low" 3 "Lower-middle" 4 "Upper-middle") ///
+        label(labsize(small) angle(0))) ///
     ///
-    box(1, color(gs10) lcolor(black) lwidth(thin)) ///
-    box(2, color(gs10) lcolor(black) lwidth(thin)) ///
-    box(3, color(gs10) lcolor(black) lwidth(thin)) ///
-    box(4, color(gs10) lcolor(black) lwidth(thin)) ///
+    box(1, fcolor(gs4)  lcolor(black) lwidth(thin)) ///
+    box(2, fcolor(gs7)  lcolor(black) lwidth(thin)) ///
+    box(3, fcolor(gs10) lcolor(black) lwidth(thin)) ///
+    box(4, fcolor(gs13) lcolor(black) lwidth(thin)) ///
     ///
-    medtype(cline, lcolor(black) lwidth(medthick) lpattern(dash)) ///
-    nooutsides ///
+    medtype(cline) medline(lcolor(white) lwidth(medthick)) ///
+    marker(1, mcolor(black) msize(vsmall)) ///
+    marker(2, mcolor(black) msize(vsmall)) ///
+    marker(3, mcolor(black) msize(vsmall)) ///
+    marker(4, mcolor(black) msize(vsmall)) ///
     ///
-    title("CO{subscript:2} Emissions by Income Group", ///
-          size(medsmall) color(black) justification(center)) ///
-    ytitle("CO{subscript:2} per Capita (metric tons)", size(small)) ///
-    b1title("Income Group", size(small) color(black)) ///
+    ytitle("CO{subscript:2} per Capita (metric tons)", size(medsmall)) ///
+    b1title("Income Group", size(medsmall)) ///
     ///
-    ylabel(0(5)25, labsize(small) nogrid) ///
-    yscale(range(0 25)) ///
-    ymtick(0(5)25) ///
+    ylabel(0(10)50, labsize(small) grid glcolor(gs14) ///
+           glwidth(vthin) glpattern(dot)) ///
     ///
-    yline(7,  lcolor(black) lwidth(thin) lpattern(solid)) ///
-    yline(20, lcolor(black) lwidth(thin) lpattern(dash))  ///
-    ///
-    graphregion(color(white) lwidth(none)) ///
-    plotregion(color(white)  lcolor(none) margin(zero)) ///
-    bgcolor(white) ///
-    ///
-    note("Note: Horizontal lines indicate global mean (solid) and" ///
-         "high-income threshold (dashed).", ///
-         size(vsmall) color(gs8)) ///
-    ///
-    xsize(14) ysize(10)
+    graphregion(color(white) margin(small)) ///
+    plotregion(color(white) lcolor(black) lwidth(thin)) ///
+    xsize(6.5) ysize(4.5) ///
+    name(box_co2, replace) nodraw
 
-graph export "boxplot_co2_income.png", replace width(2400)
+* Panel (b): Log scale
+graph box ln_co2, over(income, ///
+        relabel(1 "High" 2 "Low" 3 "Lower-middle" 4 "Upper-middle") ///
+        label(labsize(small) angle(0))) ///
+    ///
+    box(1, fcolor(gs4)  lcolor(black) lwidth(thin)) ///
+    box(2, fcolor(gs7)  lcolor(black) lwidth(thin)) ///
+    box(3, fcolor(gs10) lcolor(black) lwidth(thin)) ///
+    box(4, fcolor(gs13) lcolor(black) lwidth(thin)) ///
+    ///
+    medtype(cline) medline(lcolor(white) lwidth(medthick)) ///
+    marker(1, mcolor(black) msize(vsmall)) ///
+    marker(2, mcolor(black) msize(vsmall)) ///
+    marker(3, mcolor(black) msize(vsmall)) ///
+    marker(4, mcolor(black) msize(vsmall)) ///
+    ///
+    ytitle("ln(CO{subscript:2} per Capita)", size(medsmall)) ///
+    b1title("Income Group", size(medsmall)) ///
+    ///
+    ylabel(, labsize(small) grid glcolor(gs14) ///
+           glwidth(vthin) glpattern(dot)) ///
+    ///
+    graphregion(color(white) margin(small)) ///
+    plotregion(color(white) lcolor(black) lwidth(thin)) ///
+    xsize(6.5) ysize(4.5) ///
+    name(box_lnco2, replace) nodraw
 
-*boxplot-CO₂ Ln
-gen ln_co2 = ln(co2 + 0.01)   // add +0.01 to avoid ln(0) error
+* Combine panels
+graph combine box_co2 box_lnco2, ///
+    cols(2) iscale(0.85) ///
+    graphregion(color(white)) ///
+    xsize(13) ysize(5) ///
+    note("(a){space 48}(b)", ///
+         size(medsmall) position(6) ring(1))
 
-graph box ln_co2, over(income, label(labsize(medsmall) angle(0))) ///
-    box(1, color(gs10) lcolor(black) lwidth(thin)) ///
-    box(2, color(gs10) lcolor(black) lwidth(thin)) ///
-    box(3, color(gs10) lcolor(black) lwidth(thin)) ///
-    box(4, color(gs10) lcolor(black) lwidth(thin)) ///
-    medtype(cline, lcolor(black) lwidth(medthick) lpattern(dash)) ///
-    nooutsides ///
-    title("ln(CO{subscript:2}) Emissions by Income Group", ///
-          size(medsmall) color(black)) ///
-    ytitle("ln(CO{subscript:2} per Capita)", size(small)) ///
-    b1title("Income Group", size(small)) ///
-    ylabel(, labsize(small) nogrid) ///
-    graphregion(color(white) lwidth(none)) ///
-    plotregion(color(white) lcolor(none) margin(zero)) ///
-    bgcolor(white) ///
-    note("Note: CO{subscript:2} in natural log scale.", ///
-         size(vsmall) color(gs8)) ///
-    xsize(14) ysize(10)
+graph export "Fig2_boxplot_co2_income.pdf", replace as(pdf)
+graph export "Fig2_boxplot_co2_income.tif", replace width(3900)
 
-graph export "boxplot_lnco2_income.png", replace width(2400)
 
-* kdensity-ln_co2
+*---------------------------------------------------------------------------
+* Figure 3: Kernel density — ln(CO₂) by Income Group
+*---------------------------------------------------------------------------
 twoway ///
     (kdensity ln_co2 if income == 1, ///
         lcolor(black) lwidth(medthick) lpattern(solid)) ///
     (kdensity ln_co2 if income == 2, ///
-        lcolor(gs5)   lwidth(medthick) lpattern(dash)) ///
+        lcolor(black) lwidth(medthick) lpattern(dash)) ///
     (kdensity ln_co2 if income == 3, ///
-        lcolor(gs9)   lwidth(medthick) lpattern(shortdash)) ///
+        lcolor(gs6) lwidth(medthick) lpattern(shortdash)) ///
     (kdensity ln_co2 if income == 4, ///
-        lcolor(gs12)  lwidth(medthick) lpattern(dot)), ///
+        lcolor(gs6) lwidth(medthick) lpattern(longdash_dot)), ///
     ///
-    title("Distribution of ln(CO{subscript:2}) by Income Group", ///
-          size(medsmall) color(black)) ///
-    ytitle("Density", size(small)) ///
-    xtitle("ln(CO{subscript:2} per Capita)", size(small)) ///
+    ytitle("Density", size(medsmall)) ///
+    xtitle("ln(CO{subscript:2} per Capita)", size(medsmall)) ///
     ///
-    xlabel(-5(1)4, labsize(small) nogrid) ///
-    ylabel(, labsize(small) nogrid) ///
+    xlabel(-4(1)4, labsize(small)) ///
+    ylabel(, labsize(small) grid glcolor(gs14) ///
+           glwidth(vthin) glpattern(dot)) ///
     ///
-    xline(0, lcolor(gs10) lwidth(thin) lpattern(solid)) ///
+    xline(0, lcolor(gs10) lwidth(thin) lpattern(dot)) ///
     ///
-    legend(order(1 "High Income" 2 "Low Income" ///
-                 3 "Lower-Middle" 4 "Upper-Middle") ///
-           position(1) ring(0) rows(4) ///
-           size(small) region(lwidth(thin) lcolor(black))) ///
+    legend(order(1 "High income" 2 "Low income" ///
+                 3 "Lower-middle income" 4 "Upper-middle income") ///
+           position(2) ring(0) cols(1) ///
+           size(small) ///
+           region(lwidth(thin) lcolor(gs10) fcolor(white))) ///
     ///
-    graphregion(color(white) lwidth(none)) ///
-    plotregion(color(white) lcolor(black) lwidth(thin) margin(small)) ///
-    bgcolor(white) ///
-    xsize(14) ysize(10) ///
-    note("Note: CO{subscript:2} transformed to natural log scale." ///
-         "Vertical line at ln(CO{subscript:2})=0 (i.e., 1 metric ton).", ///
-         size(vsmall) color(gs8))
+    graphregion(color(white) margin(small)) ///
+    plotregion(color(white) lcolor(black) lwidth(thin)) ///
+    xsize(6.5) ysize(4.5)
 
-graph export "kdensity_lnco2_income.png", replace width(2400)
+graph export "Fig3_kdensity_lnco2_income.pdf", replace as(pdf)
+graph export "Fig3_kdensity_lnco2_income.tif", replace width(3900)
 
 
 
