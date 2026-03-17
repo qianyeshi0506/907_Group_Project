@@ -258,9 +258,112 @@ twoway ///
 graph export "Fig3_kdensity_lnco2_income.pdf", replace as(pdf)
 graph export "Fig3_kdensity_lnco2_income.tif", replace width(3900)
 
+/*===========================================================================
+Purpose:  All 173 countries in one single small-multiples figure
+          Sorted by income group, then alphabetically
+===========================================================================*/
 
+clear all
+set more off
 
+use "F:\Onedrive映射\1kcl\ESG\7QQMM907\907_Group_Project\1_Data\2_Processed\WB_ESG_panel_final.dta", clear
+capture rename government_effectivenes government_effectiveness
+xtset id year
 
+drop if energy_intensity==. | electricity_production==. | reshare==. ///
+      | co2==. | government_effectiveness==. | income==.
+drop if year==2000
+xtbalance, range(2002 2020)
+xtset id year
+
+* ============================================
+* Generate by income group → Merge finally
+* ============================================
+forvalues inc = 1/4 {
+
+    if `inc' == 1 local gtitle "High Income"
+    if `inc' == 2 local gtitle "Low Income"
+    if `inc' == 3 local gtitle "Lower-Middle Income"
+    if `inc' == 4 local gtitle "Upper-Middle Income"
+
+    local plots ""
+    local i = 0
+
+    * Subgraph stage rendering disabled
+    set graphics off
+
+    levelsof country_code if income == `inc', local(gc)
+    local ng : word count `gc'
+
+    if `ng' <= 15       local ncols = 5
+    else if `ng' <= 30  local ncols = 6
+    else if `ng' <= 50  local ncols = 7
+    else                local ncols = 8
+
+    foreach cc of local gc {
+        local i = `i' + 1
+
+        qui twoway ///
+            (line co2 year if country_code == "`cc'", ///
+                lcolor(black) lwidth(medthin) lpattern(solid)) ///
+            (line reshare year if country_code == "`cc'", ///
+                lcolor(gs7) lwidth(medthin) lpattern(dash) yaxis(2)), ///
+            title("`cc'", size(vsmall) color(black) margin(zero)) ///
+            ytitle("") ytitle("", axis(2)) xtitle("") ///
+            xlabel(none) ///
+            ylabel(, axis(1) labsize(zero) notick nogrid) ///
+            ylabel(, axis(2) labsize(zero) notick) ///
+            yscale(axis(1) noline) yscale(axis(2) noline) ///
+            xscale(noline) ///
+            legend(off) ///
+            graphregion(color(white) margin(zero)) ///
+            plotregion(color(white) lcolor(gs14) lwidth(vthin) ///
+                       margin(tiny)) ///
+            name(g`inc'_`i', replace) nodraw
+
+        local plots "`plots' g`inc'_`i'"
+    }
+
+    * Open graphics before combining
+    set graphics on
+
+    graph combine `plots', ///
+        cols(`ncols') iscale(*1.3) imargin(tiny) ///
+        graphregion(color(white)) ///
+        title("`gtitle' (`ng' countries)", ///
+              size(medsmall) color(black)) ///
+        note("Solid: CO{subscript:2} per capita | Dashed: RE Share (%)", ///
+             size(vsmall) color(gs6)) ///
+        xsize(20) ysize(16) ///
+        name(inc`inc', replace)
+
+    * Export each group individually
+    graph export "Fig_income`inc'.png", replace width(4000)
+
+    * Clearing subgraphs to free memory
+    forvalues j = 1/`i' {
+        capture graph drop g`inc'_`j'
+    }
+}
+
+* ============================================
+* combine into one graph
+* ============================================
+graph combine inc1 inc2 inc3 inc4, ///
+    cols(2) rows(2) iscale(*0.7) imargin(small) ///
+    graphregion(color(white)) ///
+    title("CO{subscript:2} Emissions and RE Share by Country (2002–2020)", ///
+          size(small) color(black)) ///
+    note("Solid black: CO{subscript:2} per capita (left axis)" ///
+         "Dashed grey: Renewable energy share (right axis)", ///
+         size(vsmall) color(gs6) position(6)) ///
+    xsize(28) ysize(24) ///
+    name(final_all, replace)
+
+graph export "Fig_all_countries_by_income.png", ///
+    replace width(6000) name(final_all)
+
+graph drop _all
 
 
 
